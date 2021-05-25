@@ -1,0 +1,26 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+
+# IDE / user-specific files
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Local settings and secrets
+.env
+.env.*
+!.env.example
+secrets.json
+*.pfx
+*.p12
+*.pem
+*.key
+*.crt
+*.cer
+NETCoreBase.API/appsettings.Local.json
+NETCoreBase.API/appsettings.Production.json
+NETCoreBase.API/appsettings.Staging.json
+NETCoreBase.API/appsettings.*.local.json

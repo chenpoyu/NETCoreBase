@@ -1,18 +1,20 @@
 # NETCoreBase
 
-NETCoreBase 是一個以 ASP.NET Core 5 建立的 Web API 範例專案，保留當年開發時的分層架構與套件版本，作為 .NET Core 後端基底專案參考。
+NETCoreBase 是一個 ASP.NET Core Web API 底層專案。這版已依照 2024/02 的時間點升到 .NET 8，主要目標是保留原本的 Startup、Autofac、MediatR、DB First 寫法，同時讓專案可以用 .NET 8 的工具鏈建置。
 
 ## 專案內容
 
 - `NETCoreBase.API`：Web API 入口、Swagger、JWT 驗證與 Controller。
-- `NETCoreBase.Core`：應用服務、MediatR Request/Handler、FluentValidation 驗證與 AutoMapper Profile。
-- `NETCoreBase.Common`：共用模組、Repository、JWT、權限、Excel、例外處理與工具類別。
+- `NETCoreBase.Core`：Request/Handler、Service、FluentValidation、AutoMapper Profile。
+- `NETCoreBase.Common`：Repository、JWT、權限、Excel、例外處理與共用工具。
 - `NETCoreBase.Database`：Entity Framework Core DB First 產生的 Model、DbContext 與 SQL Server schema。
+- `doc`：專案交接文件，寫法偏工程筆記，不把舊專案重新包裝。
 
 ## 主要技術
 
-- .NET 5 / ASP.NET Core Web API
-- Entity Framework Core 5 / SQL Server
+- .NET 8.0.2 / SDK 8.0.200
+- ASP.NET Core Web API
+- Entity Framework Core 8 / SQL Server
 - Autofac
 - MediatR
 - FluentValidation
@@ -33,9 +35,9 @@ NETCoreBase 是一個以 ASP.NET Core 5 建立的 Web API 範例專案，保留�
 
 ## 專案設定
 
-公開版本中的 `NETCoreBase.API/appsettings.json` 已將連線密碼、AES Key/IV、PushDecode 與 JWT Secret 改為占位值。若要在本機執行，請在本機環境改成自己的設定，不要把真實密碼或金鑰 commit 進 repository。
+公開版本中的 `NETCoreBase.API/appsettings.json` 已將連線密碼、AES Key/IV、PushDecode 與 JWT Secret 改為占位值。若要在本機執行，請用環境變數或自己的本機設定覆蓋，不要把真實密碼或金鑰 commit 進 repository。
 
-需要調整的欄位包含：
+常見要調整的欄位：
 
 - `ConnectionStrings:DefaultConnection`
 - `AesIV`
@@ -44,28 +46,33 @@ NETCoreBase 是一個以 ASP.NET Core 5 建立的 Web API 範例專案，保留�
 - `JwtTokenConfig:Secret`
 - `MailConfig:UserName`
 - `MailConfig:UserPass`
+- `SeqUrl`
 
-## 資料庫
+## Docker
 
-資料庫腳本位於 `NETCoreBase.Database/Schema.sql`。當年的資料庫啟動方式可參考 `NETCoreBase.Database/Readme.md`，包含 SQL Server Docker、Seq Docker 與 DB First scaffold 指令。
-
-範例：
-
-```bash
-docker pull mcr.microsoft.com/mssql/server:2019-latest
-docker pull datalust/seq:latest
-```
+先複製 `.env.example` 成 `.env`，再改成本機值。
 
 ```bash
-docker run -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=<YourStrongPassword>" \
-  -p 1433:1433 --name mssql -h mssql \
-  -d mcr.microsoft.com/mssql/server:2019-latest
+docker compose up --build
 ```
 
-```bash
-docker cp NETCoreBase.Database/Schema.sql mssql:/home/
-docker exec -it mssql /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P <YourStrongPassword> -i /home/Schema.sql
-```
+服務預設位置：
+
+- API：`http://localhost:8080`
+- Seq：`http://localhost:5341`
+- SQL Server：`localhost,1433`
+
+Compose 只會把 SQL Server 跑起來，不會自動建立資料表。資料庫腳本仍放在 `NETCoreBase.Database/Schema.sql`，可以照 `doc/database-notes.md` 的方式手動套用。
+
+## 文件
+
+程式文件放在 `doc`：
+
+- `doc/project-notes.md`
+- `doc/api-notes.md`
+- `doc/database-notes.md`
+- `doc/docker-notes.md`
+- `doc/net8-upgrade.md`
 
 ## API 文件
 
@@ -75,12 +82,8 @@ docker exec -it mssql /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P <YourStr
 /swagger
 ```
 
-Swagger 說明中保留當時的使用方式：先透過 Login API 取得 token，再將 token 貼到 Authorize 進行授權。
+Swagger 的使用方式維持原本做法：先透過 Login API 取得 token，再把 token 貼到 Authorize。
 
 ## 公開注意事項
 
-此 repository 已移除目前檔案中的實值密碼與金鑰，並在 `.gitignore` 加入常見本機設定與憑證檔案規則。若要將既有 repository 直接公開，仍建議先確認 Git 歷史紀錄是否曾包含真實密碼或金鑰；如果曾經 commit 過真實秘密，應先輪替該秘密並清理 Git history。
-
-## 備註
-
-這是一個保留當年實作風格的專案，未進行框架升級、套件升級或架構重構。
+目前檔案中的實值密碼與金鑰已改成占位值，也加入了常見本機設定與憑證檔案的 ignore 規則。若要把既有 repository 直接改成 public，仍要先處理 Git 歷史；只改現在的檔案，不會讓舊 commit 裡曾出現過的密碼消失。

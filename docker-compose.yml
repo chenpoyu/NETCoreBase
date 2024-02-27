@@ -1,0 +1,45 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: netcorebase-api:net8
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: "Server=db,1433;Database=NETCoreBase;Trusted_Connection=False;User=SA;Password=${MSSQL_SA_PASSWORD:?Set_MSSQL_SA_PASSWORD_in_env};TrustServerCertificate=True"
+      JwtTokenConfig__Issuer: http://localhost:8080/
+      JwtTokenConfig__Audience: http://localhost:8080/
+      JwtTokenConfig__Secret: "${JWT_SECRET:?Set_JWT_SECRET_in_env}"
+      AesIV: "${AES_IV:?Set_AES_IV_in_env}"
+      AesKey: "${AES_KEY:?Set_AES_KEY_in_env}"
+      PushDecode: "${PUSH_DECODE:?Set_PUSH_DECODE_in_env}"
+      SeqUrl: http://seq:80
+    depends_on:
+      - db
+      - seq
+
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    ports:
+      - "1433:1433"
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:?Set_MSSQL_SA_PASSWORD_in_env}"
+    volumes:
+      - mssql-data:/var/opt/mssql
+
+  seq:
+    image: datalust/seq:2024
+    ports:
+      - "5341:80"
+    environment:
+      ACCEPT_EULA: "Y"
+    volumes:
+      - seq-data:/data
+
+volumes:
+  mssql-data:
+  seq-data:

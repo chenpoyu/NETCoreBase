@@ -68,6 +68,11 @@ Compose 只會把 SQL Server 跑起來，不會自動建立資料表。資料庫
 
 程式文件放在 `doc`：
 
+- `doc/system-analysis.md`
+- `doc/system-design.md`
+- `doc/base-framework-plan.md`
+- `doc/roadmap.md`
+- `doc/operation-and-security.md`
 - `doc/project-notes.md`
 - `doc/api-notes.md`
 - `doc/database-notes.md`

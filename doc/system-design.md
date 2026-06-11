@@ -103,11 +103,12 @@ Startup 裡的 `ConfigureContainer` 會註冊：
 - `ServiceModule`
 - `EFModule`
 - `AutoMapperModule`
-- `MediatorModule`
+
+MediatR 14 已改由 `ConfigureServices` 透過 `services.AddMediatR(...)` 註冊。`MediatorModule` 現在只保留為 assembly marker，讓 MediatR 和 FluentValidation 可以找到 Core 專案裡的 Handler 與 Validator。
 
 Service 用命名慣例註冊：公開 class、非 abstract、名稱以 `Service` 結尾，就註冊成 implemented interfaces。
 
-MediatR 目前停在 11.x，原因是原本手動註冊 `ServiceFactory`。如果未來要升到 12.x，建議順手整理 MediatR 和 Autofac 的註冊方式，不要只改套件版本。
+早期版本曾用 Autofac 手動註冊 MediatR 的 `ServiceFactory`。新版 MediatR 已不適合沿用那段註冊，所以這次升級順手把 MediatR 註冊移到 `IServiceCollection`。
 
 ## 驗證設計
 
@@ -192,7 +193,7 @@ Compose 不自動套用 `Schema.sql`。這是刻意保留，避免 API 容器啟
 
 保留 Startup：
 
-這樣比較接近原本專案，不會因為升級 .NET 8 就把啟動流程重寫掉。
+這樣比較接近原本專案，不會因為升級 .NET 10 就把啟動流程重寫掉。
 
 保留 DB First：
 

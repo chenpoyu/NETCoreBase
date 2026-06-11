@@ -29,4 +29,4 @@ Startup 裡面有全域掛上 `JwtAuthPolicy` 和 `PermissionPolicy`。如果某
 
 ## 目前保留的老味道
 
-這次只把底層升到 .NET 8，沒有把專案改成 Minimal API，也沒有重寫成新版 Program.cs 寫法。原因很簡單：這個專案原本就是 Startup + Autofac 模組的結構，硬改會讓舊專案的脈絡不見。
+這次把底層升到 .NET 10，沒有把專案改成 Minimal API，也沒有重寫成新版 Program.cs 寫法。原因很簡單：這個專案原本就是 Startup + Autofac 模組的結構，硬改會讓舊專案的脈絡不見。

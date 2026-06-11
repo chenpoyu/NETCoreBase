@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using AutoMapper;
+using Microsoft.Extensions.Logging.Abstractions;
 using NETCoreBase.Core.Profiles;
 
 namespace NETCoreBase.Core
@@ -11,7 +12,7 @@ namespace NETCoreBase.Core
             builder.Register(context => new MapperConfiguration(cfg =>
             {
                 cfg.AddProfile<AutoMapperProfile>();
-            })).AsSelf().SingleInstance();
+            }, NullLoggerFactory.Instance)).AsSelf().SingleInstance();
 
             builder.Register(c =>
             {

@@ -11,7 +11,7 @@
 - 移除目前檔案中的實值密碼和金鑰。
 - 加入中文 README。
 - 補 Dockerfile、docker-compose 和 `.env.example`。
-- 升到 2024/02 的 .NET 8 版本。
+- 升到今天的 .NET 10 版本。
 - 補 SA、SD、底層規劃和展望文件。
 
 公開前仍要注意：
@@ -71,7 +71,7 @@
 - 把 GenericRepository 的責任切清楚。
 - 把錯誤處理改成統一 Result 或 ProblemDetails。
 - 整理 Controller 路由，讓 DELETE / PUT 更一致。
-- 評估 MediatR 12.x 之後的註冊方式。
+- 持續觀察 MediatR 14.x 之後的註冊方式和授權模式。
 - 評估是否仍需要 Autofac。
 
 這些改動都會碰到既有風格，不建議和安全修正混在同一批做。

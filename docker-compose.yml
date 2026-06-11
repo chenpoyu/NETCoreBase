@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: netcorebase-api:net8
+    image: netcorebase-api:net10
     ports:
       - "8080:8080"
     environment:

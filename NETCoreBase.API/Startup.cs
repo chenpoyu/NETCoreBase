@@ -24,6 +24,8 @@ using Newtonsoft.Json.Serialization;
 using NETCoreBase.Common.Services;
 using NETCoreBase.Common.Interfaces;
 using Serilog;
+using MediatR;
+using NETCoreBase.Core.Behaviors;
 
 namespace NETCoreBase.API
 {
@@ -41,7 +43,6 @@ namespace NETCoreBase.API
             builder.RegisterModule(new ServiceModule());
             builder.RegisterModule(new EFModule(Configuration.GetConnectionString("DefaultConnection")));
             builder.RegisterModule(new AutoMapperModule());
-            builder.RegisterModule(new MediatorModule());
         }
 
         // This method gets called by the runtime. Use this method to add services to the container.
@@ -60,6 +61,12 @@ namespace NETCoreBase.API
             var coreModuleOptions = (JwtTokenConfig) Configuration.GetSection("JwtTokenConfig").Get<JwtTokenConfig>();
 
             services.AddCoreModule(coreModuleOptions);
+            services.AddMediatR(cfg =>
+            {
+                cfg.RegisterServicesFromAssemblyContaining<MediatorModule>();
+                cfg.AddOpenBehavior(typeof(ValidatorBehavior<,>));
+            });
+
             services.AddControllers(c =>
             {
                 c.RespectBrowserAcceptHeader = true;

@@ -21,4 +21,5 @@
 - `api-notes.md`：Controller 和 API 使用方式。
 - `database-notes.md`：資料庫、DbContext、Schema 腳本的說明。
 - `docker-notes.md`：Dockerfile、docker-compose 和本機環境變數。
-- `net8-upgrade.md`：這次升到 .NET 8 時動到的地方。
+- `net10-upgrade.md`：這次升到 .NET 10 時動到的地方。
+- `net8-upgrade.md`：前一次升到 .NET 8 的歷史紀錄。

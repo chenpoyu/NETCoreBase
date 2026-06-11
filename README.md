@@ -1,6 +1,6 @@
 # NETCoreBase
 
-NETCoreBase 是一個 ASP.NET Core Web API 底層專案。這版已依照 2024/02 的時間點升到 .NET 8，主要目標是保留原本的 Startup、Autofac、MediatR、DB First 寫法，同時讓專案可以用 .NET 8 的工具鏈建置。
+NETCoreBase 是一個 ASP.NET Core Web API 底層專案。這版已依照 2026-06-11 的時間點升到 .NET 10，主要目標是保留原本的 Startup、Autofac、MediatR、DB First 寫法，同時讓專案可以用目前的 .NET 10 工具鏈建置。
 
 ## 專案內容
 
@@ -12,9 +12,9 @@ NETCoreBase 是一個 ASP.NET Core Web API 底層專案。這版已依照 2024/0
 
 ## 主要技術
 
-- .NET 8.0.2 / SDK 8.0.200
+- .NET 10.0.9 / SDK 10.0.301
 - ASP.NET Core Web API
-- Entity Framework Core 8 / SQL Server
+- Entity Framework Core 10 / SQL Server
 - Autofac
 - MediatR
 - FluentValidation
@@ -77,6 +77,7 @@ Compose 只會把 SQL Server 跑起來，不會自動建立資料表。資料庫
 - `doc/api-notes.md`
 - `doc/database-notes.md`
 - `doc/docker-notes.md`
+- `doc/net10-upgrade.md`
 - `doc/net8-upgrade.md`
 
 ## API 文件

@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:8.0.200 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.301 AS build
 WORKDIR /src
 
 COPY NETCoreBase.sln ./
@@ -12,7 +12,7 @@ RUN dotnet restore NETCoreBase.API/NETCoreBase.API.csproj
 COPY . .
 RUN dotnet publish NETCoreBase.API/NETCoreBase.API.csproj -c Release -o /app/publish /p:UseAppHost=false
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0.2 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.9 AS runtime
 WORKDIR /app
 
 ENV ASPNETCORE_URLS=http://+:8080

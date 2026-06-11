@@ -11,6 +11,7 @@ using NETCoreBase.Common.Exceptions;
 namespace NETCoreBase.Core.Behaviors
 {
     public class ValidatorBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+        where TRequest : notnull
     {
         private readonly IEnumerable<IValidator<TRequest>> _validators;
 
@@ -19,14 +20,7 @@ namespace NETCoreBase.Core.Behaviors
             _validators = validators;
         }
 
-        public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next)
-        {
-            var response = await next();
-
-            return response;
-        }
-
-        public Task<TResponse> Handle(TRequest request, CancellationToken cancellationToken, RequestHandlerDelegate<TResponse> next)
+        public Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
         {
             var context = new ValidationContext<TRequest>(request);
             var failures = _validators
@@ -48,7 +42,7 @@ namespace NETCoreBase.Core.Behaviors
                 throw new CustomValidationException(failures);
             }
 
-            return next();
+            return next(cancellationToken);
 
         }
 

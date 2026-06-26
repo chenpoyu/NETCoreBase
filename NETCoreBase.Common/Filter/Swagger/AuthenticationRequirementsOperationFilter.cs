@@ -1,11 +1,9 @@
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.OpenApi.Models;
-using Swashbuckle.AspNetCore.SwaggerGen;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.OpenApi;
+using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace NETCoreBase.Common.Filter.Swagger
 {
@@ -27,14 +25,20 @@ namespace NETCoreBase.Common.Filter.Swagger
 
             if (actionAthorize.Any() || controllerAthorize.Any())
             {
-                operation.Responses.Add("401", new OpenApiResponse { Description = "Unauthorized" });
-                operation.Responses.Add("403", new OpenApiResponse { Description = "Forbidden" });
+                if (operation.Responses == null)
+                    operation.Responses = new OpenApiResponses();
+
+                if (!operation.Responses.ContainsKey("401"))
+                    operation.Responses.Add("401", new OpenApiResponse { Description = "Unauthorized" });
+                if (!operation.Responses.ContainsKey("403"))
+                    operation.Responses.Add("403", new OpenApiResponse { Description = "Forbidden" });
 
                 if (operation.Security == null)
                     operation.Security = new List<OpenApiSecurityRequirement>();
 
-
-                var scheme = new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" } };
+                // In Microsoft.OpenApi v2, use OpenApiSecuritySchemeReference instead of
+                // OpenApiSecurityScheme with an inline Reference property.
+                var scheme = new OpenApiSecuritySchemeReference("Bearer", null, null);
                 operation.Security.Add(new OpenApiSecurityRequirement
                 {
                     [scheme] = new List<string>()

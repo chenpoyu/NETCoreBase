@@ -1,30 +1,36 @@
 using System.Linq;
 using System.Net.Sockets;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Infrastructure;
 
 namespace NETCoreBase.API.Controllers
 {
     [Authorize]
     public class BaseApiController : ControllerBase
     {
-        public readonly string _ip;
-        public readonly string _token;
-        public BaseApiController()
+        protected string ClientIp
         {
-            IActionContextAccessor accessor = new ActionContextAccessor();
-            var ip = accessor.ActionContext.HttpContext.Connection.RemoteIpAddress;
-            if (ip != null) {
+            get
+            {
+                var ip = HttpContext?.Connection?.RemoteIpAddress;
+                if (ip == null) return null;
                 if (ip.AddressFamily == AddressFamily.InterNetworkV6)
                 {
-                    ip = System.Net.Dns.GetHostEntry(ip).AddressList.First(c => c.AddressFamily == AddressFamily.InterNetwork);
+                    var ipv4 = System.Net.Dns.GetHostEntry(ip).AddressList
+                        .FirstOrDefault(c => c.AddressFamily == AddressFamily.InterNetwork);
+                    return ipv4?.ToString();
                 }
-                _ip = ip.ToString();
+                return ip.ToString();
             }
-            _token = accessor.ActionContext?.HttpContext?.GetTokenAsync("access_token")?.Result;
-            //HttpContext.Connection.RemoteIpAddress.ToString();
+        }
+
+        protected string BearerToken
+        {
+            get
+            {
+                var authHeader = HttpContext?.Request?.Headers?.Authorization.ToString();
+                return authHeader?.StartsWith("Bearer ") == true ? authHeader[7..] : null;
+            }
         }
     }
 }

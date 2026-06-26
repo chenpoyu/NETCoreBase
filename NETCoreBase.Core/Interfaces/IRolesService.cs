@@ -8,7 +8,7 @@ using NETCoreBase.Common;
 
 namespace NETCoreBase.Core.Interfaces
 {
-    public interface IRolesService : IDisposable
+    public interface IRolesService
     {
         /// <summary>
         /// 查詢角色

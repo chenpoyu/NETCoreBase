@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 namespace NETCoreBase.Database.Models
 {
-    public partial class Role
+    public partial class Role : NETCoreBase.Database.ISoftDeletable
     {
         public Role()
         {
@@ -21,6 +21,7 @@ namespace NETCoreBase.Database.Models
         public DateTimeOffset CreateDate { get; set; }
         public string UpdateUser { get; set; }
         public DateTimeOffset? UpdateDate { get; set; }
+        public long Version { get; set; }
 
         public virtual ICollection<RoleFeature> RoleFeatures { get; set; }
         public virtual ICollection<UserRole> UserRoles { get; set; }

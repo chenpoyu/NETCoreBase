@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 namespace NETCoreBase.Database.Models
 {
-    public partial class Feature
+    public partial class Feature : NETCoreBase.Database.ISoftDeletable
     {
         public Feature()
         {
@@ -24,6 +24,7 @@ namespace NETCoreBase.Database.Models
         public DateTimeOffset CreateDate { get; set; }
         public string UpdateUser { get; set; }
         public DateTimeOffset? UpdateDate { get; set; }
+        public long Version { get; set; }
 
         public virtual Feature Parent { get; set; }
         public virtual ICollection<FeaturePermission> FeaturePermissions { get; set; }

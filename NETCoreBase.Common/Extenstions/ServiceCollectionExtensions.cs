@@ -29,31 +29,22 @@ namespace Microsoft.Extensions.DependencyInjection
         {
             services.AddOauthJwt(options);
             services.AddPermission();
+            services.AddHttpContextAccessor();
+
+            // Feature 4: Password-reset store (singleton)
+            services.AddSingleton<NETCoreBase.Common.Interfaces.IPasswordResetStore,
+                                  NETCoreBase.Common.Services.PasswordResetStore>();
+
+            // Feature 12: i18n localisation
+            // The caller (Startup.cs) also calls AddLocalization; we register it here
+            // in case AddCoreModule is called without Startup.
+            services.AddLocalization(opts => opts.ResourcesPath = "Resources");
         }
 
         private static void AddOauthJwt(this IServiceCollection services, JwtTokenConfig options)
         {
-
             services.AddSingleton(options);
 
-            // services.AddIdentity<User, Role>(options =>
-            // {
-            //     //options.ClaimsIdentity.UserIdClaimType = JwtRegisteredClaimNames.NameId;
-            //     options.ClaimsIdentity.UserNameClaimType = JwtRegisteredClaimNames.Sub;
-            //     options.ClaimsIdentity.RoleClaimType = "role";
-            //     options.SignIn.RequireConfirmedAccount = false;
-            //     options.SignIn.RequireConfirmedEmail = false;
-            //     options.Password.RequireDigit = true;
-            //     options.Password.RequiredLength = 8;
-            //     options.Password.RequireNonAlphanumeric = false;
-            //     options.Password.RequireUppercase = true;
-            //     options.Password.RequireLowercase = true;
-            // })
-            //     .AddEntityFrameworkStores<NETCoreBaseContext>();
-
-            // ??
-            // JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Remove(JwtRegisteredClaimNames.Sub);
-            // JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Remove("roles");
             services.AddAuthentication(x =>
             {
                 x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -66,12 +57,10 @@ namespace Microsoft.Extensions.DependencyInjection
                     x.SaveToken = true;
                     x.TokenValidationParameters = new TokenValidationParameters
                     {
-                        // 透過這項宣告，就可以從 "sub" 取值並設定給 User.Identity.Name
                         NameClaimType = JwtRegisteredClaimNames.Sub,
-                        // 透過這項宣告，就可以從 "roles" 取值，並可讓 [Authorize] 判斷角色
                         RoleClaimType = ClaimTypes.Role,
                         RequireExpirationTime = true,
-                        
+
                         ValidateIssuer = true,
                         ValidIssuer = options.Issuer,
                         ValidateIssuerSigningKey = true,
@@ -98,7 +87,8 @@ namespace Microsoft.Extensions.DependencyInjection
             services.AddTransient<IAuthorizationHandler, JwtAuthHandler>();
             services.AddSingleton<IJwtAuthManager, JwtAuthManager>();
             services.AddSingleton<IActionContextAccessor, ActionContextAccessor>();
-            services.AddTransient<ClaimsPrincipal>(s => s.GetService<IHttpContextAccessor>().HttpContext.User);
+            services.AddTransient<ClaimsPrincipal>(s => s.GetService<IHttpContextAccessor>().HttpContext?.User
+                ?? new ClaimsPrincipal());
         }
 
         private static void AddPermission(this IServiceCollection services)
@@ -112,14 +102,13 @@ namespace Microsoft.Extensions.DependencyInjection
             services.AddScoped<IAuthorizationHandler, PermissionHandler>();
             services.AddScoped<IPermissionService, PermissionService>();
         }
-        
+
         public static IMvcBuilder AddExcelOutputFormatter(this IMvcBuilder builder)
         {
             builder.Services.TryAddEnumerable(
                 ServiceDescriptor.Transient<IConfigureOptions<MvcOptions>, ExcelOutputFormatterSetup>());
 
             return builder;
-
         }
 
         public class ExcelOutputFormatterSetup : IConfigureOptions<MvcOptions>

@@ -32,12 +32,12 @@ namespace NETCoreBase.API
             {
                 Log.Information("Starting web host");
                 CreateHostBuilder(args).Build().Run();
-                return 1;
+                return 0;
             }
             catch (Exception ex)
             {
                 Log.Fatal(ex, "Host terminated unexpectedly");
-                return 0;
+                return 1;
             }
             finally
             {

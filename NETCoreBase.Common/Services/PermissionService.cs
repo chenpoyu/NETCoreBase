@@ -1,29 +1,26 @@
-﻿using AutoMapper;
-using Microsoft.AspNetCore.Identity;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Claims;
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using NETCoreBase.Common.Interfaces;
 using NETCoreBase.Common.Model;
-using NETCoreBase.Common.Services;
 using NETCoreBase.Database.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Security.Claims;
-using System.Text;
-using System.Threading.Tasks;
-// using NETCoreBaseContextPartial =  NETCoreBase.Database.Partial.NETCoreBaseContext;
 
 namespace NETCoreBase.Common.Services
 {
-    public class PermissionService : GenericRepository<FeaturePermission>, IPermissionService
+    public class PermissionService : IPermissionService
     {
+        private const string PermissionCacheKey = "NETCoreBase_PermissionDic";
+
         private readonly ILogger<PermissionService> _logger;
         private readonly NETCoreBaseContext _context;
         private readonly IMemoryCache _cache;
 
-        public PermissionService(ILogger<PermissionService> logger, NETCoreBaseContext context, IMemoryCache cache) : base(context)
+        public PermissionService(ILogger<PermissionService> logger, NETCoreBaseContext context, IMemoryCache cache)
         {
             _logger = logger;
             _context = context;
@@ -32,7 +29,7 @@ namespace NETCoreBase.Common.Services
 
         public async Task<bool> HasPermission(ClaimsPrincipal user, List<string> permissions)
         {
-            if (!_cache.TryGetValue<Dictionary<string, List<RoleFeaturePermission>>>("permissionDic", out var permissionDic))
+            if (!_cache.TryGetValue<Dictionary<string, List<RoleFeaturePermission>>>(PermissionCacheKey, out var permissionDic))
             {
                 var linq = from r in _context.Roles
                            join rf in _context.RoleFeatures on r.Id equals rf.RoleId
@@ -45,7 +42,7 @@ namespace NETCoreBase.Common.Services
                            };
                 var list = await linq.ToListAsync();
                 permissionDic = list.GroupBy(v => v.Permission).ToDictionary(g => g.Key, g => g.ToList());
-                _cache.Set("permissionDic", permissionDic, TimeSpan.FromMinutes(5));
+                _cache.Set(PermissionCacheKey, permissionDic, TimeSpan.FromMinutes(5));
             }
 
             var hasPermission = false;
@@ -62,6 +59,11 @@ namespace NETCoreBase.Common.Services
             }
 
             return hasPermission;
+        }
+
+        public void ClearPermissionCache()
+        {
+            _cache.Remove(PermissionCacheKey);
         }
     }
 }

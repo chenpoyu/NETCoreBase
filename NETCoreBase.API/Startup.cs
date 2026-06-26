@@ -1,42 +1,46 @@
 using System;
 using System.IO;
 using System.Reflection;
+using System.Threading.RateLimiting;
+using Asp.Versioning;
 using Autofac;
 using FluentValidation.AspNetCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
+using NETCoreBase.API.HealthChecks;
 using NETCoreBase.Common;
+using NETCoreBase.Common.Filter;
 using NETCoreBase.Common.Filter.Swagger;
+using NETCoreBase.Common.Middleware;
 using NETCoreBase.Common.Model;
 using NETCoreBase.Common.Policies;
 using NETCoreBase.Core;
-using Microsoft.EntityFrameworkCore;
-using NETCoreBase.Common.Filter;
-using System.Text.Json;
-using Microsoft.AspNetCore.Mvc.Formatters;
-using NETCoreBase.Common.Formatters;
-using Newtonsoft.Json.Serialization;
-using NETCoreBase.Common.Services;
-using NETCoreBase.Common.Interfaces;
+using NETCoreBase.Core.Behaviors;
+using Prometheus;
 using Serilog;
 using MediatR;
-using NETCoreBase.Core.Behaviors;
 
 namespace NETCoreBase.API
 {
     public class Startup
     {
-        public Startup(IConfiguration configuration)
+        public Startup(IConfiguration configuration, IWebHostEnvironment environment)
         {
             Configuration = configuration;
+            Environment = environment;
         }
 
         public IConfiguration Configuration { get; }
+        public IWebHostEnvironment Environment { get; }
 
         public void ConfigureContainer(ContainerBuilder builder)
         {
@@ -45,7 +49,6 @@ namespace NETCoreBase.API
             builder.RegisterModule(new AutoMapperModule());
         }
 
-        // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddCors(options =>
@@ -53,46 +56,71 @@ namespace NETCoreBase.API
                 options.AddPolicy("BaseCorsPolicy", builder => builder
                     .AllowAnyMethod()
                     .AllowAnyHeader()
-                    .SetIsOriginAllowed(orign => true)
+                    .SetIsOriginAllowed(origin => true)
                     .AllowCredentials()
                 );
             });
 
-            var coreModuleOptions = (JwtTokenConfig) Configuration.GetSection("JwtTokenConfig").Get<JwtTokenConfig>();
-
+            var coreModuleOptions = (JwtTokenConfig)Configuration.GetSection("JwtTokenConfig").Get<JwtTokenConfig>();
             services.AddCoreModule(coreModuleOptions);
+            services.AddScoped<HttpResponseExceptionFilter>();
+
+            services.AddHealthChecks()
+                .AddCheck<DatabaseHealthCheck>("database");
+
+            services.AddRateLimiter(options =>
+            {
+                options.AddPolicy("account", httpContext =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                        factory: _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = 5,
+                            Window = TimeSpan.FromMinutes(1),
+                            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                            QueueLimit = 0,
+                        }));
+                options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+                options.OnRejected = async (context, cancellationToken) =>
+                {
+                    context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+                    await context.HttpContext.Response.WriteAsJsonAsync(new
+                    {
+                        type = "about:blank",
+                        title = "請求過於頻繁，請稍後再試",
+                        status = 429,
+                    }, cancellationToken);
+                };
+            });
+
             services.AddMediatR(cfg =>
             {
                 cfg.RegisterServicesFromAssemblyContaining<MediatorModule>();
                 cfg.AddOpenBehavior(typeof(ValidatorBehavior<,>));
             });
 
+            services.AddApiVersioning(options =>
+            {
+                options.DefaultApiVersion = new ApiVersion(1, 0);
+                options.AssumeDefaultVersionWhenUnspecified = true;
+                options.ReportApiVersions = true;
+            }).AddMvc();
+
+            var bearerPolicy = new AuthorizationPolicyBuilder(JwtBearerDefaults.AuthenticationScheme)
+                .RequireAuthenticatedUser()
+                .Build();
+
             services.AddControllers(c =>
             {
                 c.RespectBrowserAcceptHeader = true;
-                c.Filters.Add(new AuthorizeFilter(JwtAuthPolicy.PolicyName));
+                c.Filters.Add(new AuthorizeFilter(bearerPolicy));
                 c.Filters.Add(new AuthorizeFilter(PermissionPolicy.PolicyName));
-                // c.Filters.Add(typeof(ResultMiddleware));
-                c.Filters.Add(new HttpResponseExceptionFilter());
-
+                c.Filters.Add(typeof(HttpResponseExceptionFilter));
             }).AddFluentValidation(fv =>
             {
                 fv.RegisterValidatorsFromAssemblyContaining<MediatorModule>();
-                fv.RunDefaultMvcValidationAfterFluentValidationExecutes = false;
             })
-            // .AddNewtonsoftJson(o => 
-            // { 
-            //     o.SerializerSettings.ContractResolver = new DefaultContractResolver
-            //     {
-            //         NamingStrategy = new SnakeCaseNamingStrategy()
-            //     };
-            // })
-            .AddExcelOutputFormatter()
-            //.AddDataAnnotationsLocalization(options => {
-            //    options.DataAnnotationLocalizerProvider = (type, factory) =>
-            //        factory.Create(typeof(DataAnnotationResource));
-            //})
-            ;
+            .AddExcelOutputFormatter();
 
             services.AddSwaggerGen(c =>
             {
@@ -106,7 +134,7 @@ namespace NETCoreBase.API
                 c.IncludeXmlComments($"{AppDomain.CurrentDomain.BaseDirectory}/NETCoreBase.API.xml");
                 c.IncludeXmlComments($"{AppDomain.CurrentDomain.BaseDirectory}/NETCoreBase.Core.xml");
                 c.IncludeXmlComments($"{AppDomain.CurrentDomain.BaseDirectory}/NETCoreBase.Common.xml");
-                c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme()
+                c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
                 {
                     Type = SecuritySchemeType.Http,
                     Scheme = "bearer",
@@ -114,16 +142,13 @@ namespace NETCoreBase.API
                     Name = "Authorization",
                     In = ParameterLocation.Header,
                 });
-                // c.OperationFilter<ResponseHeadersFilter>();
                 c.OperationFilter<AuthenticationRequirementsOperationFilter>();
                 c.DescribeAllParametersInCamelCase();
                 c.CustomSchemaIds(type => type.ToString());
             })
             .AddSwaggerGenNewtonsoftSupport();
-            
         }
 
-        // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
             if (env.IsDevelopment())
@@ -133,12 +158,28 @@ namespace NETCoreBase.API
                 app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "NET Core Base v1"));
             }
 
+            // Feature 5: Access log middleware (early, skips /health /swagger)
+            app.UseMiddleware<AccessLogMiddleware>();
 
+            // Feature 6: Prometheus HTTP metrics collection
+            app.UseHttpMetrics();
+
+            app.UseMiddleware<CorrelationIdMiddleware>();
             app.UseHttpsRedirection();
-            app.UseSerilogRequestLogging();
+            app.UseSerilogRequestLogging(options =>
+            {
+                options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+                {
+                    if (httpContext.Items.TryGetValue(CorrelationIdMiddleware.HeaderName, out var correlationId))
+                        diagnosticContext.Set("CorrelationId", correlationId?.ToString());
+                };
+            });
 
             app.UseRouting();
+            app.UseRateLimiter();
             app.UseCors("BaseCorsPolicy");
+
+            // UseCoreModule = UseAuthentication + TokenBlacklist + UseAuthorization
             app.UseCoreModule();
 
             app.UseEndpoints(endpoints =>
@@ -146,7 +187,10 @@ namespace NETCoreBase.API
                 endpoints.MapControllerRoute(
                     name: "default",
                     pattern: "{controller}/{action=Index}/{id?}");
-                //endpoints.MapControllers();
+                endpoints.MapHealthChecks("/health").AllowAnonymous();
+
+                // Feature 6: Prometheus scrape endpoint (no auth)
+                endpoints.MapMetrics("/prometheus").AllowAnonymous();
             });
         }
     }

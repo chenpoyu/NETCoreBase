@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>1.3</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="error.user.not_found" xml:space="preserve">
+    <value>查無此使用者</value>
+  </data>
+  <data name="error.user.already_exists" xml:space="preserve">
+    <value>帳號已存在</value>
+  </data>
+  <data name="error.user.invalid_credentials" xml:space="preserve">
+    <value>帳號或密碼錯誤</value>
+  </data>
+  <data name="error.user.account_locked" xml:space="preserve">
+    <value>帳號已鎖定，請稍後再試</value>
+  </data>
+  <data name="error.user.account_locked_until" xml:space="preserve">
+    <value>帳號已鎖定，請於 {0} 分鐘後再試</value>
+  </data>
+  <data name="error.user.require_change_password" xml:space="preserve">
+    <value>請先變更密碼</value>
+  </data>
+  <data name="error.role.not_found" xml:space="preserve">
+    <value>查無此角色</value>
+  </data>
+  <data name="error.feature.not_found" xml:space="preserve">
+    <value>查無此功能</value>
+  </data>
+  <data name="error.banner.not_found" xml:space="preserve">
+    <value>查無此 Banner</value>
+  </data>
+  <data name="error.token.invalid" xml:space="preserve">
+    <value>Token 無效</value>
+  </data>
+  <data name="error.token.refresh_not_found" xml:space="preserve">
+    <value>Refresh Token 不存在或已使用</value>
+  </data>
+  <data name="error.token.refresh_expired" xml:space="preserve">
+    <value>Refresh Token 已過期</value>
+  </data>
+  <data name="error.token.reset_not_found" xml:space="preserve">
+    <value>重設密碼 Token 不存在或已使用</value>
+  </data>
+  <data name="error.token.reset_expired" xml:space="preserve">
+    <value>重設密碼 Token 已過期</value>
+  </data>
+  <data name="error.password.wrong_old_password" xml:space="preserve">
+    <value>舊密碼不正確</value>
+  </data>
+  <data name="error.concurrency.conflict" xml:space="preserve">
+    <value>資料已被其他人修改，請重新整理後再試</value>
+  </data>
+</root>

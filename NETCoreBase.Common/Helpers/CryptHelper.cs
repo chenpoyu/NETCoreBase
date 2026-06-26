@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
@@ -9,6 +10,7 @@ namespace NETCoreBase.Common.Helpers
     public static class CryptHelper
     {
         private static IConfiguration _configuration;
+        private static readonly PasswordHasher<object> _passwordHasher = new PasswordHasher<object>();
 
         private static List<int> AES_CRYPT_LENGTH = new List<int>() {
             128, 192, 256
@@ -68,20 +70,18 @@ namespace NETCoreBase.Common.Helpers
             return base64String;
         }
 
-        public static string HashAu4A83(string au4a83)
+        public static string HashPassword(string password)
         {
-            string base64String;
-            if (!string.IsNullOrWhiteSpace(au4a83))
-            {
-                byte[] bytes = Encoding.UTF8.GetBytes(au4a83);
-                byte[] numArray = (new SHA1CryptoServiceProvider()).ComputeHash(bytes, 0, (int)bytes.Length);
-                base64String = Convert.ToBase64String(numArray);
-            }
-            else
-            {
-                base64String = au4a83;
-            }
-            return base64String;
+            if (string.IsNullOrWhiteSpace(password)) return password;
+            return _passwordHasher.HashPassword(null, password);
+        }
+
+        public static bool VerifyPassword(string hashedPassword, string providedPassword)
+        {
+            if (string.IsNullOrWhiteSpace(hashedPassword) || string.IsNullOrWhiteSpace(providedPassword))
+                return false;
+            var result = _passwordHasher.VerifyHashedPassword(null, hashedPassword, providedPassword);
+            return result != PasswordVerificationResult.Failed;
         }
 
         private static void ValidateKeyIVLength(string key, string iv)

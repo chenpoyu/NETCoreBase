@@ -1,277 +1,297 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Dynamic.Core;
-using System.Linq.Expressions;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
-using AutoMapper;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
-using NETCoreBase.Core.Commands;
-using NETCoreBase.Core.Interfaces;
-using NETCoreBase.Common.Interfaces;
-using NETCoreBase.Common.Services;
-using NETCoreBase.Database;
-using NETCoreBase.Database.Models;
-using NETCoreBase.Common.Helpers;
-using NETCoreBase.Core.Commands.Users;
 using NETCoreBase.Common;
 using NETCoreBase.Common.Exceptions;
+using NETCoreBase.Common.Helpers;
+using NETCoreBase.Common.Interfaces;
+using NETCoreBase.Common.Model;
+using NETCoreBase.Common.Resources;
+using NETCoreBase.Core.Commands.Users;
+using NETCoreBase.Core.Interfaces;
+using NETCoreBase.Database;
+using NETCoreBase.Database.Models;
 
 namespace NETCoreBase.Core.Services
 {
-    public class UsersService : GenericRepository<User>, IUsersService
+    public class UsersService : IUsersService
     {
         private readonly ILogger<UsersService> _logger;
         private readonly NETCoreBaseContext _context;
-        private readonly IMapper _mapper;
+        private readonly IGenericRepository<User> _repository;
         private readonly IJwtAuthManager _jwtAuthManager;
-        private readonly ClaimsPrincipal _clamis;
+        private readonly IServiceScopeFactory _scopeFactory;
+        private readonly IPasswordResetStore _resetStore;
+        private readonly IStringLocalizer<SharedResource> _localizer;
 
-        public UsersService(ILogger<UsersService> logger, NETCoreBaseContext context, 
-            IMapper mapper, IJwtAuthManager jwtAuthManager, ClaimsPrincipal clamis) 
-            : base(context, mapper, clamis)
+        public UsersService(
+            ILogger<UsersService> logger,
+            NETCoreBaseContext context,
+            IGenericRepository<User> repository,
+            IJwtAuthManager jwtAuthManager,
+            IServiceScopeFactory scopeFactory,
+            IPasswordResetStore resetStore,
+            IStringLocalizer<SharedResource> localizer)
         {
             _logger = logger;
             _context = context;
-            _mapper = mapper;
+            _repository = repository;
             _jwtAuthManager = jwtAuthManager;
-            _clamis = clamis;
+            _scopeFactory = scopeFactory;
+            _resetStore = resetStore;
+            _localizer = localizer;
         }
 
-        /// <summary>
-        /// 登入
-        /// </summary>
-        /// <param name="req"></param>
-        /// <returns></returns>
+        // Feature 1 + 2: Login with lockout & require-change-password
         public async Task<LoginResponse> LoginAsync(LoginRequest req)
         {
-            var pass = CryptHelper.HashAu4A83(req.UserPass);
-            var user = await base.FirstOrDefaultAsync<User>(
-                u => u.UserName == req.UserName && u.PasswordHash == pass && u.Status == "A");
+            var user = await _context.Users
+                .Where(u => u.UserName == req.UserName && u.Status == "A")
+                .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+                .FirstOrDefaultAsync();
 
-            var log = new UserLogin()
+            // Lockout check
+            if (user != null && user.Lockout != null && user.Lockout > DateTimeOffset.Now)
             {
-                UserName = req.UserName,
-                PasswordHash = req.UserPass,
-                Status = (user == null ? "F" : "S"),
-                UserId = user?.Id,
-                CreateDate = DateTime.Now,
-            };
-            _context.UserLogins.Add(log);
-            await _context.SaveChangesAsync();
-
-            if (user == null)
-            {
-                throw new MessageException(400, "帳號或密碼錯誤");
+                var mins = (int)Math.Ceiling((user.Lockout.Value - DateTimeOffset.Now).TotalMinutes);
+                throw new MessageException(423, string.Format(
+                    _localizer["error.user.account_locked_until"].Value, mins));
             }
 
-            var model = await _context.Users.Where(u => u.Id == user.Id)
-                            .Include(u => u.UserRoles)
-                            .ThenInclude(ur => ur.Role)
-                            .FirstOrDefaultAsync();
+            var verified = user != null && CryptHelper.VerifyPassword(user.PasswordHash, req.UserPass);
 
-            var token = GenerateTokens(model);
-            return new LoginResponse() {
-                Token = token,
+            if (!verified)
+            {
+                if (user != null)
+                {
+                    user.AccessFailedCount++;
+                    if (user.AccessFailedCount >= 5)
+                    {
+                        user.Lockout = DateTimeOffset.Now.AddMinutes(30);
+                        user.AccessFailedCount = 0;
+                    }
+                    _context.Entry(user).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+                }
+                SaveLoginLogAsync(req.UserName, "F", user?.Id);
+                throw new MessageException(401, _localizer["error.user.invalid_credentials"].Value);
+            }
+
+            // Success — reset lockout
+            user.AccessFailedCount = 0;
+            user.Lockout = null;
+            user.LastLogin = DateTimeOffset.Now;
+            _context.Entry(user).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            SaveLoginLogAsync(req.UserName, "S", user.Id);
+
+            var tokenResult = BuildTokenResult(user);
+            return new LoginResponse
+            {
+                Token = tokenResult.AccessToken,
+                RefreshToken = tokenResult.RefreshToken,
+                ExpiresAt = tokenResult.ExpiresAt,
+                RequireChangePassword = user.RequireChangeMima == "Y",
             };
         }
 
-        /// <summary>
-        /// 註冊
-        /// </summary>
-        /// <param name="req"></param>
-        /// <returns></returns>
         public async Task<RegisterResponse> RegisterAsync(RegisterRequest req)
         {
-            if (null != await base.FirstOrDefaultAsync<User>(u => u.UserName == req.UserName))
-            {
-                throw new MessageException(400, "帳號已存在");
-            }
+            if (null != await _repository.FirstOrDefaultAsync<User>(u => u.UserName == req.UserName))
+                throw new MessageException(400, _localizer["error.user.already_exists"].Value);
 
-            var pass = CryptHelper.HashAu4A83(req.UserPass);
-            var user = new User()
+            var user = new User
             {
                 UserName = req.UserName,
-                PasswordHash = pass,
+                PasswordHash = CryptHelper.HashPassword(req.UserPass),
                 NormalizedUserName = req.NormalizedUserName,
                 Email = req.Email,
                 PhoneNumber = req.PhoneNumber,
             };
+            _context.Users.Add(user);
+            await _repository.SaveAsync();
+            SaveLoginLogAsync(req.UserName, "S", user.Id);
 
-            await base.InsertAsync<User>(user);
-
-            var log = new UserLogin()
+            var tokenResult = BuildTokenResult(user);
+            return new RegisterResponse
             {
-                UserName = req.UserName,
-                PasswordHash = req.UserPass,
-                Status = "S",
-                UserId = user?.Id,
-                CreateDate = DateTime.Now,
-            };
-            _context.UserLogins.Add(log);
-            await _context.SaveChangesAsync();
-
-            var token = GenerateTokens(user);
-            return new RegisterResponse() {
-                Token = token,
+                Token = tokenResult.AccessToken,
+                RefreshToken = tokenResult.RefreshToken,
+                ExpiresAt = tokenResult.ExpiresAt,
             };
         }
 
-        private string GenerateTokens(User user)
+        // Feature 2: Change password
+        public async Task ChangePasswordAsync(Guid userId, ChangePasswordRequest req)
         {
-            var clamiList = new List<Claim> {
-                new Claim("userId", user.Id.ToString()),
-                new Claim(ClaimTypes.Name, user.UserName),
-            };
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId && u.Status == "A");
+            if (user == null)
+                throw new MessageException(404, _localizer["error.user.not_found"].Value);
 
-            if (user.UserRoles != null && user.UserRoles.Count > 0)
-            {
-                foreach (var role in user.UserRoles)
-                {
-                    if (!string.IsNullOrWhiteSpace(role.Role.Name))
-                    {
-                        clamiList.Add(new Claim(ClaimTypes.Role, role.Role.Name));
-                    }
-                }
-            }
+            if (!CryptHelper.VerifyPassword(user.PasswordHash, req.OldPassword))
+                throw new MessageException(400, _localizer["error.password.wrong_old_password"].Value);
 
-            var token = _jwtAuthManager.GenerateTokens(user.Id.ToString(), clamiList.ToArray(), DateTime.Now);
-            return token;
+            user.PasswordHash = CryptHelper.HashPassword(req.NewPassword);
+            user.RequireChangeMima = "N";
+            user.LastChangeMimaDate = DateTimeOffset.Now;
+            _context.Entry(user).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
         }
 
-        /// <summary>
-        /// 查詢使用者
-        /// </summary>
-        /// <param name="req"></param>
-        /// <returns></returns>
+        // Feature 4: Forgot / Reset password
+        public async Task<ForgotPasswordResponse> ForgotPasswordAsync(ForgotPasswordRequest req)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.UserName == req.Username && u.Status == "A");
+            if (user == null)
+                throw new MessageException(404, _localizer["error.user.not_found"].Value);
+
+            var bytes = new byte[64];
+            RandomNumberGenerator.Fill(bytes);
+            var resetToken = Convert.ToBase64String(bytes).Replace('+', '-').Replace('/', '_').TrimEnd('=');
+            _resetStore.Store(resetToken, req.Username);
+
+            // Skeleton: return token directly (production: send via email)
+            return new ForgotPasswordResponse { ResetToken = resetToken };
+        }
+
+        public async Task ResetPasswordAsync(ResetPasswordRequest req)
+        {
+            var username = _resetStore.Consume(req.ResetToken);
+            if (username == null)
+                throw new MessageException(400, _localizer["error.token.reset_not_found"].Value);
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.UserName == username && u.Status == "A");
+            if (user == null)
+                throw new MessageException(404, _localizer["error.user.not_found"].Value);
+
+            user.PasswordHash = CryptHelper.HashPassword(req.NewPassword);
+            user.RequireChangeMima = "N";
+            user.LastChangeMimaDate = DateTimeOffset.Now;
+            _context.Entry(user).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+        }
+
         public async Task<PageResult<UserListResponse>> GetUserListAsync(UserListRequest req)
         {
             var linq = _context.Users.Where(req.GetExpression())
-                            .Include(u => u.UserRoles)
-                            .ThenInclude(ur => ur.Role)
-                            .Select(u => new UserListResponse()
-                            {
-                                Id = u.Id,
-                                UserName = u.UserName,
-                                Name = u.NormalizedUserName,
-                                Email = u.Email,
-                                PhoneNumber = u.PhoneNumber,
-                                Status = u.Status,
-                                Roles = u.UserRoles.Select(ur => new UserRoleListResponse()
-                                {
-                                    Id = ur.Role.Id,
-                                    Name = ur.Role.Name,
-                                    NormalizedName = ur.Role.NormalizedName,
-                                }),
-                            });
+                .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+                .Select(u => new UserListResponse
+                {
+                    Id = u.Id,
+                    UserName = u.UserName,
+                    Name = u.NormalizedUserName,
+                    Email = u.Email,
+                    PhoneNumber = u.PhoneNumber,
+                    Status = u.Status,
+                    Roles = u.UserRoles.Select(ur => new UserRoleListResponse
+                    {
+                        Id = ur.Role.Id,
+                        Name = ur.Role.Name,
+                        NormalizedName = ur.Role.NormalizedName,
+                    }),
+                });
             return new PageResult<UserListResponse>(await linq.ToListAsync(), await linq.CountAsync());
         }
 
-        /// <summary>
-        /// 用ID查詢使用者
-        /// </summary>
-        /// <param name="req"></param>
-        /// <returns></returns>
         public async Task<UserByIdResponse> GetUserByIdAsync(UserByIdRequest req)
         {
-            var user = await base.FirstOrDefaultAsync<UserByIdResponse>(u => u.Id == req.Id);
+            var user = await _repository.FirstOrDefaultAsync<UserByIdResponse>(u => u.Id == req.Id);
             if (user == null)
-            {
-                throw new MessageException(404, "無此使用者");
-            }
+                throw new MessageException(404, _localizer["error.user.not_found"].Value);
             return user;
         }
 
-        /// <summary>
-        /// 建立使用者
-        /// </summary>
-        /// <param name="req"></param>
-        /// <returns></returns>
         public async Task CreateUserAsync(CreateUserRequest req)
         {
-            if (null != await base.FirstOrDefaultAsync<User>(u => u.UserName == req.UserName))
-            {
-                throw new MessageException(400, "帳號已存在");
-            }
+            if (null != await _repository.FirstOrDefaultAsync<User>(u => u.UserName == req.UserName))
+                throw new MessageException(400, _localizer["error.user.already_exists"].Value);
 
-            var pass = CryptHelper.HashAu4A83(req.UserPass);
-            req.UserPass = pass;
-
-            var user = await base.InsertAsync<CreateUserRequest>(req);
-
+            req.UserPass = CryptHelper.HashPassword(req.UserPass);
+            var user = await _repository.InsertAsync<CreateUserRequest>(req);
             await UpdateUserRoleAsync(user.Id, req.Roles);
         }
 
-        /// <summary>
-        /// 修改使用者
-        /// </summary>
-        /// <param name="req"></param>
-        /// <returns></returns>
         public async Task UpdateUserAsync(UpdateUserRequest req)
         {
-            var user = await base.FirstOrDefaultAsync<User>(u => u.Id == req.Id);
-
+            var user = await _repository.FirstOrDefaultAsync<User>(u => u.Id == req.Id);
             if (user == null)
-            {
-                throw new MessageException(400, "無此使用者");
-            }
-            
+                throw new MessageException(400, _localizer["error.user.not_found"].Value);
+
             user.NormalizedUserName = req.Name;
             user.Email = req.Email;
             user.PhoneNumber = req.PhoneNumber;
             user.Status = req.Status ?? "A";
-
-            await base.UpdateAsync(user);
-
+            await _repository.UpdateAsync(user);
             await UpdateUserRoleAsync(req.Id, req.Roles);
         }
 
-        /// <summary>
-        /// 刪除使用者
-        /// </summary>
-        /// <param name="req"></param>
-        /// <returns></returns>
         public async Task DeleteUserAsync(DeleteUserRequest req)
         {
-            var users = await base.QueryAsync<User>(u => req.Id.Contains(u.Id));
-            foreach (var u in users)
-            {
-                u.Status = "D";
-            }
-            await base.UpdateRangeAsync(users);
+            var users = await _repository.QueryAsync<User>(u => req.Id.Contains(u.Id));
+            foreach (var u in users) u.Status = "D";
+            await _repository.UpdateRangeAsync(users);
         }
 
-        /// <summary>
-        /// 建立使用者擁有的角色
-        /// </summary>
-        /// <param name="userId"></param>
-        /// <param name="roles"></param>
-        /// <returns></returns>
+        private TokenResult BuildTokenResult(User user)
+        {
+            var claimList = new List<Claim>
+            {
+                new Claim("userId", user.Id.ToString()),
+                new Claim(ClaimTypes.Name, user.UserName),
+            };
+            if (user.UserRoles != null)
+            {
+                foreach (var ur in user.UserRoles)
+                    if (!string.IsNullOrWhiteSpace(ur.Role?.Name))
+                        claimList.Add(new Claim(ClaimTypes.Role, ur.Role.Name));
+            }
+            return _jwtAuthManager.GenerateTokens(user.Id.ToString(), claimList.ToArray(), DateTime.Now);
+        }
+
+        // Feature 8: fire-and-forget login log using new DI scope
+        private void SaveLoginLogAsync(string userName, string status, Guid? userId)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using var scope = _scopeFactory.CreateScope();
+                    var context = scope.ServiceProvider.GetRequiredService<NETCoreBaseContext>();
+                    context.UserLogins.Add(new UserLogin
+                    {
+                        UserName = userName,
+                        PasswordHash = string.Empty,
+                        Status = status,
+                        UserId = userId,
+                        CreateDate = DateTime.Now,
+                    });
+                    await context.SaveChangesAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to save login log for user {UserName}", userName);
+                }
+            });
+        }
+
         private async Task UpdateUserRoleAsync(Guid userId, List<Guid> roles)
         {
             if (roles != null && roles.Count > 0)
             {
                 var list = await _context.UserRoles.Where(u => u.UserId == userId).ToListAsync();
-
                 var adds = roles.Where(r => !list.Any(l => l.RoleId == r)).ToList();
                 var removes = list.Where(l => !roles.Any(r => r == l.RoleId)).ToList();
-                // var edits = roles.Where(r => !adds.Any(a => a == r)).ToList();
-
-                List<UserRole> urlist = new List<UserRole>();
-                foreach (var a in adds)
-                {
-                    urlist.Add(new UserRole()
-                    {
-                        UserId = userId,
-                        RoleId = a,
-                    });
-                }
+                var urlist = adds.Select(a => new UserRole { UserId = userId, RoleId = a }).ToList();
                 _context.AddRange(urlist);
                 _context.RemoveRange(removes);
-
-                await SaveChangesAsync();
+                await _repository.SaveAsync();
             }
         }
     }

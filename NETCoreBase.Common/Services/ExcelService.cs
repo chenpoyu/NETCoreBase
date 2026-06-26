@@ -23,7 +23,7 @@ namespace NETCoreBase.Common.Services
     {
         public ExcelService()
         {
-            ExcelPackage.LicenseContext = OfficeOpenXml.LicenseContext.NonCommercial;
+            ExcelPackage.License.SetNonCommercialPersonal("NETCoreBase");
         }
 
         static object ProcessValue(PropertyInfo property, object value)

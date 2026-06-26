@@ -30,6 +30,7 @@ namespace NETCoreBase.Common.Services
 			{
 				throw new ArgumentNullException("context fail");
 			}
+			_context = context;
 		}
 
 		public GenericRepository(NETCoreBaseContext context, IMapper mapper)
@@ -65,6 +66,8 @@ namespace NETCoreBase.Common.Services
 			_context.Entry(entity).State = EntityState.Deleted;
 		}
 
+		public Task<int> SaveAsync() => SaveChangesAsync();
+
 		protected virtual async Task<int> SaveChangesAsync()
 		{
 			if (_clamis != null)
@@ -83,11 +86,13 @@ namespace NETCoreBase.Common.Services
 			}
 		}
 
-		public List<T> ExecSQL<T>(string query)
+		public List<T> ExecSQL<T>(string query, params DbParameter[] parameters)
 		{
 			using DbCommand dbCommand = _context.Database.GetDbConnection().CreateCommand();
 			dbCommand.CommandText = query;
 			dbCommand.CommandType = CommandType.Text;
+			if (parameters?.Length > 0)
+				dbCommand.Parameters.AddRange(parameters);
 			_context.Database.OpenConnection();
 			List<T> list = new List<T>();
 			using (DbDataReader dbDataReader = dbCommand.ExecuteReader())

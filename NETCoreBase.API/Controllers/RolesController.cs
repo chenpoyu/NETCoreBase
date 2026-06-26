@@ -1,23 +1,19 @@
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
+using Asp.Versioning;
 using MediatR;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
-using NETCoreBase.Common.Handlers;
-using NETCoreBase.Common.Policies;
 using NETCoreBase.Core.Commands.Roles;
-using NETCoreBase.Core.Interfaces;
 
 namespace NETCoreBase.API.Controllers
 {
+    [ApiVersion("1.0")]
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/v{version:apiVersion}/[controller]")]
     public class RolesController : BaseApiController
     {
         private readonly IMediator _mediator;
-        
+
         public RolesController(IMediator mediator)
         {
             _mediator = mediator;
@@ -26,8 +22,6 @@ namespace NETCoreBase.API.Controllers
         /// <summary>
         /// 取得多筆角色資料
         /// </summary>
-        /// <param name="req"></param>
-        /// <returns></returns>
         [HttpGet("", Name = nameof(GetAllRoles))]
         public async Task<IActionResult> GetAllRoles([FromQuery] RoleListRequest req)
         {
@@ -35,10 +29,8 @@ namespace NETCoreBase.API.Controllers
         }
 
         /// <summary>
-        /// 取得多筆角色資料
+        /// 用ID取得角色資料
         /// </summary>
-        /// <param name="req"></param>
-        /// <returns></returns>
         [HttpGet("{id}", Name = nameof(GetRoleById))]
         public async Task<IActionResult> GetRoleById([FromRoute] RoleByIdRequest req)
         {
@@ -48,8 +40,6 @@ namespace NETCoreBase.API.Controllers
         /// <summary>
         /// 建立角色
         /// </summary>
-        /// <param name="req"></param>
-        /// <returns></returns>
         [HttpPost("", Name = nameof(PostRole))]
         public async Task<IActionResult> PostRole(CreateRoleRequest req)
         {
@@ -59,9 +49,6 @@ namespace NETCoreBase.API.Controllers
         /// <summary>
         /// 修改角色
         /// </summary>
-        /// <param name="id"></param>
-        /// <param name="req"></param>
-        /// <returns></returns>
         [HttpPut("{id}", Name = nameof(PutRole))]
         public async Task<IActionResult> PutRole(Guid id, UpdateRoleRequest req)
         {
@@ -76,14 +63,11 @@ namespace NETCoreBase.API.Controllers
         /// <summary>
         /// 刪除角色
         /// </summary>
-        /// <param name="req"></param>
-        /// <returns></returns>
         [HttpDelete("", Name = nameof(DeleteRole))]
         public async Task<IActionResult> DeleteRole(DeleteRoleRequest req)
         {
             await _mediator.Send(req);
             return NoContent();
         }
-
     }
 }

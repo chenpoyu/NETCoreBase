@@ -1,6 +1,6 @@
-
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.EntityFrameworkCore;
 using NETCoreBase.Common.Exceptions;
 
 namespace NETCoreBase.Common.Filter
@@ -31,6 +31,19 @@ namespace NETCoreBase.Common.Filter
                 })
                 {
                     StatusCode = 400,
+                };
+                context.ExceptionHandled = true;
+            }
+            else if (context.Exception is DbUpdateConcurrencyException)
+            {
+                context.Result = new ObjectResult(new ProblemDetails
+                {
+                    Status = 409,
+                    Title = "資料已被其他人修改，請重新整理後再試",
+                    Type = "https://httpstatuses.com/409"
+                })
+                {
+                    StatusCode = 409,
                 };
                 context.ExceptionHandled = true;
             }

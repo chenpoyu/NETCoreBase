@@ -8,7 +8,7 @@ using NETCoreBase.Common;
 
 namespace NETCoreBase.Core.Interfaces
 {
-    public interface IFeaturesService : IDisposable
+    public interface IFeaturesService
     {
         /// <summary>
         /// 查詢功能

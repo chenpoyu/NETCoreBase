@@ -90,7 +90,8 @@ CREATE TABLE [dbo].[Banners](
 	[UpdateDate] [datetimeoffset](7) NOT NULL,
 	[CreateUser] [nvarchar](20) NULL,
 	[UpdateUser] [nvarchar](20) NULL,
- CONSTRAINT [PK_Banners] PRIMARY KEY CLUSTERED 
+	[Version] [bigint] NOT NULL DEFAULT 0,
+ CONSTRAINT [PK_Banners] PRIMARY KEY CLUSTERED
 (
 	[Id] ASC
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
@@ -112,6 +113,7 @@ CREATE TABLE [dbo].[Features](
 	[CreateDate] [datetimeoffset](7) NOT NULL,
 	[UpdateUser] [nvarchar](20) NULL,
 	[UpdateDate] [datetimeoffset](7) NULL,
+	[Version] [bigint] NOT NULL DEFAULT 0,
  CONSTRAINT [PK_Features] PRIMARY KEY CLUSTERED 
 (
 	[Id] ASC
@@ -159,6 +161,7 @@ CREATE TABLE [dbo].[Roles](
 	[CreateDate] [datetimeoffset](7) NOT NULL,
 	[UpdateUser] [nvarchar](20) NULL,
 	[UpdateDate] [datetimeoffset](7) NULL,
+	[Version] [bigint] NOT NULL DEFAULT 0,
  CONSTRAINT [PK_Roles] PRIMARY KEY CLUSTERED 
 (
 	[Id] ASC
@@ -219,6 +222,7 @@ CREATE TABLE [dbo].[Users](
 	[CreateDate] [datetimeoffset](7) NOT NULL,
 	[UpdateUser] [nvarchar](20) NULL,
 	[UpdateDate] [datetimeoffset](7) NULL,
+	[Version] [bigint] NOT NULL DEFAULT 0,
  CONSTRAINT [PK_Users] PRIMARY KEY CLUSTERED 
 (
 	[Id] ASC

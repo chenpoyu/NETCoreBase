@@ -53,6 +53,8 @@ namespace NETCoreBase.Database.Models
                     .IsFixedLength(true);
 
                 entity.Property(e => e.UpdateUser).HasMaxLength(20);
+
+                entity.Property(e => e.Version).IsConcurrencyToken();
             });
 
             modelBuilder.Entity<Feature>(entity =>
@@ -79,6 +81,8 @@ namespace NETCoreBase.Database.Models
                     .IsFixedLength(true);
 
                 entity.Property(e => e.UpdateUser).HasMaxLength(20);
+
+                entity.Property(e => e.Version).IsConcurrencyToken();
 
                 entity.HasOne(d => d.Parent)
                     .WithMany(p => p.InverseParent)
@@ -125,6 +129,8 @@ namespace NETCoreBase.Database.Models
                     .IsFixedLength(true);
 
                 entity.Property(e => e.UpdateUser).HasMaxLength(20);
+
+                entity.Property(e => e.Version).IsConcurrencyToken();
             });
 
             modelBuilder.Entity<RoleFeature>(entity =>
@@ -202,6 +208,8 @@ namespace NETCoreBase.Database.Models
                 entity.Property(e => e.UserName)
                     .IsRequired()
                     .HasMaxLength(256);
+
+                entity.Property(e => e.Version).IsConcurrencyToken();
             });
 
             modelBuilder.Entity<UserLogin>(entity =>
